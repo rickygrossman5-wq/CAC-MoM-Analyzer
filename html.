@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAC MoM Analyzer — PLTFRM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/papaparse@5.5.4/papaparse.min.js" onerror="window.__vendorError='PapaParse (CDN)'"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js" onerror="window.__vendorError='SheetJS/XLSX (CDN)'"></script>
+<script src="https://unpkg.com/chart.js@4.5.1/dist/chart.umd.js" onerror="window.__vendorError='Chart.js (CDN)'"></script>
+<style>
+/* ============================================================
+   PLTFRM design system — Archivo + DM Mono, warm near-black,
+   rounded cards, pill controls, zebra tables.
+   Mapped onto the existing markup class names.
+   ============================================================ */
+:root{
+  --black:#0C0C0A;
+  --ink:#161614;
+  --card:#1E1E1C;
+  --card-2:#252523;
+  --line:rgba(255,255,255,.13);
+  --line-soft:rgba(255,255,255,.06);
+  --white:#F0F0EB;
+  --gray:#9A9A92;
+  --gray-dim:#5E5E58;
+  --green:#3ECF74;
+  --red:#F05252;
+  --sans:'Archivo',system-ui,sans-serif;
+  --mono:'DM Mono',Menlo,monospace;
+  --serif:var(--sans);
+  --pad:clamp(1.1rem,4vw,3rem);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--black);color:var(--white);min-height:100vh;-webkit-font-smoothing:antialiased;line-height:1.5;overflow-x:hidden}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");background-repeat:repeat;background-size:128px}
+body>*{position:relative;z-index:1}
+.masthead{display:flex;align-items:center;gap:.7rem;padding:var(--pad) var(--pad) 0;max-width:1100px;margin:0 auto}
+.tick{width:6px;height:20px;background:var(--white);border-radius:2px}
+.eyebrow{font-family:var(--mono);font-size:.66rem;letter-spacing:.18em;color:var(--gray-dim);text-transform:uppercase}
+.page-nav{display:flex;gap:.5rem;margin-left:auto}
+.page-nav a{font-family:var(--sans);font-size:.72rem;font-weight:500;letter-spacing:.02em;text-transform:uppercase;color:var(--gray);text-decoration:none;padding:6px 14px;border:1px solid var(--line);border-radius:20px;transition:color .12s,border-color .12s,background .12s}
+.page-nav a:hover{color:var(--white);border-color:rgba(255,255,255,.3)}
+.page-nav a.active{background:var(--white);color:var(--black);border-color:var(--white);font-weight:600}
+.hero{padding:clamp(2rem,6vw,3.5rem) var(--pad) clamp(1.6rem,4vw,2.4rem);max-width:1100px;margin:0 auto}
+.hero-title{font-family:var(--sans);font-weight:700;letter-spacing:.01em;font-size:clamp(2.6rem,8vw,5rem);line-height:.95;text-transform:uppercase}
+.hero-rule{color:var(--gray-dim);font-weight:400;padding:0 .04em}
+.hero-sub{font-family:var(--sans);font-size:clamp(1rem,1.8vw,1.15rem);color:var(--gray);max-width:54ch;margin-top:1.2rem;line-height:1.5}
+.stage{padding:clamp(1.4rem,3.5vw,2.2rem) var(--pad);border-top:1px solid var(--line-soft);max-width:1100px;margin:0 auto}
+.stage-index{display:flex;align-items:center;gap:.8rem;margin-bottom:1.2rem;flex-wrap:wrap}
+.stage-index span:first-child{font-family:var(--mono);font-size:.85rem;color:var(--gray-dim)}
+.stage-name{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray)}
+.stage-note{font-family:var(--sans);color:var(--gray);font-size:.9rem;max-width:64ch;margin-bottom:1.3rem}
+.skip-toggle{display:inline-flex;align-items:center;gap:.45rem;margin-left:auto;font-family:var(--mono);font-size:.7rem;color:var(--gray-dim);cursor:pointer;text-transform:none}
+.skip-toggle input{accent-color:var(--white);cursor:pointer}
+.skip-toggle:hover{color:var(--white)}
+.err-banner{background:#3a1414;border-bottom:1px solid var(--red);color:#ffb4b4;font-family:var(--mono);font-size:.78rem;padding:.8rem var(--pad);line-height:1.5}
+.upload-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:1rem;align-items:stretch}
+
+.drop{display:flex;flex-direction:column;gap:.45rem;justify-content:center;min-height:130px;padding:1.5rem;cursor:pointer;user-select:none;background:var(--ink);border:1px dashed var(--line);border-radius:10px;transition:border-color .15s,background .15s}
+.drop:hover{background:var(--card);border-color:rgba(255,255,255,.28)}
+.drop.loaded{border-style:solid;border-color:var(--green);background:rgba(62,207,116,.07)}
+.drop.drag{border-color:rgba(255,255,255,.45);background:var(--card)}
+.drop-wide{min-height:120px}
+.drop-period{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray-dim)}
+.drop-cue{font-family:var(--sans);font-size:1.15rem;font-weight:600;color:var(--white)}
+.drop-file{font-family:var(--mono);font-size:.78rem;color:var(--green);word-break:break-all}
+.arrow{align-self:center;font-family:var(--sans);font-size:1.6rem;color:var(--gray-dim)}
+.label-row{display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:.35rem}
+.field label{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray-dim)}
+input[type=text],input[type=number],textarea,select{font-family:var(--sans);font-size:.8rem;padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:var(--ink);color:var(--white);outline:none;transition:border-color .12s;min-width:150px}
+input[type=text]:focus,input[type=number]:focus,textarea:focus,select:focus{border-color:rgba(255,255,255,.4)}
+input::placeholder,textarea::placeholder{color:var(--gray-dim)}
+.cat-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(180px,2.4fr) auto;gap:.7rem;margin-bottom:.6rem;align-items:center}
+.cat-row input{width:100%}
+.cat-del{background:transparent;border:1px solid var(--line);border-radius:8px;color:var(--gray);width:34px;height:34px;cursor:pointer;font-size:1rem;transition:.15s}
+.cat-del:hover{border-color:var(--red);color:var(--red)}
+.ghost-btn,.run-btn{font-family:var(--sans);cursor:pointer;border-radius:20px;transition:opacity .12s,color .12s,border-color .12s,background .12s}
+.ghost-btn{font-size:.75rem;font-weight:500;padding:7px 16px;background:transparent;color:var(--gray);border:1px solid var(--line)}
+.ghost-btn:hover{color:var(--white);border-color:rgba(255,255,255,.35)}
+.run-btn{font-size:.85rem;font-weight:600;padding:9px 22px;background:var(--white);color:var(--black);border:1px solid var(--white)}
+.run-btn:hover:not(:disabled){opacity:.85}
+.run-btn:disabled{background:var(--card);color:var(--gray-dim);border-color:var(--line);cursor:not-allowed}
+.run-bar{display:flex;align-items:center;gap:1.1rem;padding:1.2rem var(--pad) 2rem;max-width:1100px;margin:0 auto;flex-wrap:wrap}
+.run-hint{font-family:var(--mono);font-size:.72rem;color:var(--gray-dim)}
+.copy-btn.copied{border-color:var(--green);color:var(--green)}
+.results-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;border-top:1px solid var(--line)}
+.results-head .stage-index{margin-bottom:0}
+.head-actions{display:flex;gap:.55rem;align-items:center}
+#period-name{font-family:var(--mono)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.8rem;padding:0 var(--pad);max-width:1100px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+.card-label{font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray-dim);margin-bottom:10px}
+.card-val{font-family:var(--mono);font-size:1.7rem;font-weight:500;line-height:1;color:var(--white)}
+.card-flow{font-family:var(--mono);font-size:.72rem;color:var(--gray-dim);margin-top:8px}
+.card-delta{font-family:var(--mono);font-size:.72rem;margin-top:5px}
+.up{color:var(--green)} .down{color:var(--red)} .flat{color:var(--gray-dim)}
+.block{padding:clamp(1.6rem,3.5vw,2.4rem) var(--pad);border-top:1px solid var(--line-soft);max-width:1100px;margin:0 auto}
+.block-title{font-family:var(--sans);font-weight:600;font-size:clamp(1.1rem,2.2vw,1.4rem);margin-bottom:1.2rem;letter-spacing:.01em}
+.block-sub{color:var(--gray-dim);font-size:.8em;font-weight:400}
+.block-title code{font-family:var(--mono);font-size:.72em;background:var(--ink);padding:.12em .45em;border:1px solid var(--line);border-radius:4px}
+.scope-bar{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:1.2rem var(--pad) .2rem;max-width:1100px;margin:0 auto}
+.scope-label{font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray-dim)}
+.scope-toggle{display:inline-flex;gap:6px;flex-wrap:wrap}
+.scope-opt{font-family:var(--sans);font-size:.75rem;font-weight:500;padding:6px 16px;border:1px solid var(--line);border-radius:20px;background:transparent;color:var(--gray);cursor:pointer;transition:color .12s,border-color .12s,background .12s}
+.scope-opt:hover{color:var(--white);border-color:rgba(255,255,255,.3)}
+.scope-opt.active{background:var(--white);color:var(--black);border-color:var(--white);font-weight:600}
+.scope-count{font-family:var(--mono);opacity:.55;margin-left:.3em;font-size:.92em}
+.scope-opt.active .scope-count{opacity:.5}
+.scope-note{font-family:var(--mono);font-size:.68rem;color:var(--gray-dim)}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--black)}
+table{width:100%;border-collapse:collapse;font-size:.72rem}
+th,td{padding:9px 16px;white-space:nowrap;text-align:right}
+th:first-child,td:first-child{text-align:left}
+thead th{font-family:var(--mono);font-weight:500;font-size:.58rem;letter-spacing:.09em;text-transform:uppercase;color:var(--gray-dim);border-bottom:1px solid var(--line);background:var(--ink);position:sticky;top:0;z-index:5}
+tbody td{border-bottom:1px solid var(--line-soft);color:var(--white);vertical-align:middle}
+tbody tr:nth-child(odd) td{background:var(--black)}
+tbody tr:nth-child(even) td{background:var(--ink)}
+tbody tr:hover td{background:var(--card)!important}
+tbody tr:last-child td{border-bottom:none}
+.seg-label{font-family:var(--sans);font-weight:600;color:var(--white)}
+.muted{color:var(--gray-dim)}
+.metric-name{font-family:var(--sans);color:var(--gray);text-align:left;width:9rem}
+.muted-num{color:var(--gray);font-family:var(--mono)}
+td.num,.num{font-family:var(--mono)}
+.flag{display:inline-block;font-family:var(--mono);font-size:.58rem;padding:2px 7px;border-radius:4px;border:1px solid var(--line);color:var(--gray);background:rgba(255,255,255,.04);margin-left:.4rem}
+.flag.nb{color:var(--green);border-color:rgba(62,207,116,.4)}
+.flag.b{color:var(--gray);border-color:var(--line)}
+.flag.dsp{color:#8FB7FF;border-color:rgba(143,183,255,.35)}
+.movers-controls{display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
+.movers-search{font-size:.74rem;padding:5px 14px;border-radius:20px;min-width:200px;flex:0 1 300px}
+.movers-count{font-family:var(--mono);font-size:.7rem;color:var(--gray-dim)}
+table.movers th.sortable{cursor:pointer;user-select:none}
+table.movers th.sortable:hover,table.movers th.active{color:var(--white)}
+table.movers th:first-child,table.movers td:first-child{position:sticky;left:0;z-index:2;box-shadow:1px 0 0 var(--line);min-width:240px;max-width:340px;overflow:hidden;text-overflow:ellipsis}
+table.movers thead th:first-child{z-index:6;background:var(--ink)}
+table.movers tbody tr:nth-child(odd) td:first-child{background:var(--black)}
+table.movers tbody tr:nth-child(even) td:first-child{background:var(--ink)}
+table.movers tbody tr:hover td:first-child{background:var(--card)!important}
+.chart-frame{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.1rem;margin-bottom:1.5rem;height:300px}
+.caption{font-family:var(--sans);color:var(--gray-dim);font-size:.9rem;margin-top:1rem;max-width:70ch;line-height:1.5}
+.rec-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.rec-col{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:0 1.2rem 1.2rem}
+.rec-head{font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;padding:1rem 0 .8rem;font-weight:500}
+.rec-head.pause{color:var(--red)} .rec-head.lean{color:var(--green)}
+.rec-item{padding:.8rem 0;border-top:1px solid var(--line-soft)}
+.rec-name{font-family:var(--sans);font-size:.95rem;font-weight:500;line-height:1.3}
+.rec-reason{font-family:var(--mono);font-size:.72rem;margin-top:.25rem}
+.rec-item.pause .rec-reason{color:var(--red)}
+.rec-item.lean .rec-reason{color:var(--green)}
+.rec-empty{font-family:var(--sans);color:var(--gray-dim);font-style:italic;padding:.8rem 0;border-top:1px solid var(--line-soft)}
+table.dd-table{width:100%;border-collapse:collapse;font-size:.74rem;min-width:1500px}
+table.dd-table th{font-family:var(--mono);font-weight:500;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gray-dim);border-bottom:1px solid var(--line);padding:9px 12px;white-space:nowrap;background:var(--ink);position:sticky;top:0;z-index:5;text-align:right}
+table.dd-table th:first-child{text-align:left}
+table.dd-table th.sortable{cursor:pointer;user-select:none}
+table.dd-table th.sortable:hover,table.dd-table th.active{color:var(--white)}
+table.dd-table td{padding:9px 12px;font-size:.76rem;white-space:nowrap;border-bottom:1px solid var(--line-soft);text-align:right}
+table.dd-table td:first-child{text-align:left}
+table.dd-table td.num{text-align:right;font-family:var(--mono)}
+table.dd-table th:first-child,table.dd-table td:first-child{position:sticky;left:0;z-index:2;box-shadow:1px 0 0 var(--line);min-width:300px;max-width:380px;overflow:hidden;text-overflow:ellipsis}
+table.dd-table thead th:first-child{z-index:6;background:var(--ink)}
+.dd-camp-row{cursor:pointer}
+.dd-camp-row td{border-bottom:1px solid var(--line);color:var(--white);background:var(--ink)}
+.dd-camp-row:hover td{background:var(--card)}
+.dd-camp-row td:first-child{background:var(--ink)}
+.dd-camp-row:hover td:first-child{background:var(--card)}
+.dd-toggle{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--line);border-radius:5px;color:var(--gray);font-size:.9rem;line-height:1;margin-right:.6rem;cursor:pointer;flex:0 0 auto;transition:.12s}
+.dd-toggle:hover{border-color:var(--white);color:var(--white)}
+.dd-campname{font-family:var(--sans);font-weight:600;font-size:.9rem}
+.dd-tcount{font-family:var(--mono);color:var(--gray-dim);font-size:.7rem;margin-left:.5rem}
+.dd-tcount::before{content:"·  "}
+.dd-target-row td{color:var(--gray);background:var(--black)}
+.dd-target-row td:first-child{padding-left:2.6rem;background:var(--black)}
+.dd-target-row:hover td{background:var(--card)}
+.dd-target-row:hover td:first-child{background:var(--card)}
+.dd-target{font-family:var(--sans);font-size:.82rem;color:var(--gray)}
+.dd-match{font-family:var(--mono);font-size:.58rem;letter-spacing:.05em;color:var(--gray-dim);border:1px solid var(--line);border-radius:4px;padding:.1em .45em;text-transform:lowercase}
+.query-stage{border-top:1px solid var(--line-soft)}
+.query-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:1.5rem;align-items:start}
+.query-box{background:var(--card);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.query-toolbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.7rem .9rem;border-bottom:1px solid var(--line)}
+.query-tag{font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray-dim)}
+.query-code{margin:0;padding:1rem;font-family:var(--mono);font-size:.74rem;line-height:1.55;color:var(--gray);white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;background:var(--black)}
+.query-steps{margin:0;padding-left:1.3rem;display:flex;flex-direction:column;gap:.55rem;font-family:var(--sans);font-size:.88rem;color:var(--gray);line-height:1.45}
+.query-steps strong{color:var(--white);font-weight:600}
+.query-steps em{color:var(--white);font-style:normal;border-bottom:1px solid var(--gray-dim)}
+.footer{padding:2.4rem var(--pad) 3rem;max-width:1100px;margin:0 auto}
+.footer-rule{height:1px;background:var(--line);margin-bottom:1rem}
+.footer-mark{font-family:var(--sans);font-weight:700;letter-spacing:.12em;font-size:.78rem;text-transform:uppercase}
+.footer-note{font-family:var(--mono);display:block;margin-top:.5rem;color:var(--gray-dim);font-size:.72rem}
+@media(max-width:760px){.upload-grid{grid-template-columns:1fr}.arrow{transform:rotate(90deg)}.rec-grid{grid-template-columns:1fr}.query-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="err-banner" id="err-banner" hidden></div>
+
+<header class="masthead">
+  <div class="tick"></div>
+  <span class="eyebrow">PLTFRM · NEW-TO-BRAND · MONTH OVER MONTH</span>
+  <nav class="page-nav">
+    <a href="index.html" class="active">MoM Movement</a>
+    <a href="deepdive.html">SP Deep Dive</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <h1 class="hero-title">CAC<span class="hero-rule">/</span>Movement</h1>
+  <p class="hero-sub">Drop two new-to-brand campaign exports. We hold spend, customer acquisition cost, NTB sales and share up to the light and show you where the month actually moved — by category, by campaign, and what to do next.</p>
+</section>
+
+<!-- STAGE 0: COPY AMC QUERY -->
+<section class="stage query-stage" id="query-stage">
+  <div class="stage-index"><span>00</span><span class="stage-name">Copy AMC query — Campaign NTB report</span></div>
+  <p class="stage-note">Run this query in your brand's AMC instance to generate the two CSVs this page needs (one per month).</p>
+  <div class="query-grid">
+    <div class="query-box">
+      <div class="query-toolbar">
+        <span class="query-tag">Campaign NTB report</span>
+        <button class="ghost-btn copy-btn" id="copy-query">Copy query</button>
+      </div>
+      <pre class="query-code" id="query-text">-- Campaign NTB query will be provided here --</pre>
+    </div>
+    <ol class="query-steps">
+      <li>Copy the query above.</li>
+      <li>Log in to your brand's <strong>AMC</strong> instance.</li>
+      <li>Open the <strong>Query editor</strong>.</li>
+      <li>Paste the query and set the date range.</li>
+      <li><strong>Run it twice</strong> — once for the <em>previous month</em>, once for the <em>current month</em>.</li>
+      <li>Download both CSVs and drop them below (earlier month on the left, later on the right).</li>
+    </ol>
+  </div>
+</section>
+
+<!-- STAGE 1: UPLOAD -->
+<section class="stage" id="upload-stage">
+  <div class="stage-index"><span>01</span><span class="stage-name">Load the months</span></div>
+  <div class="upload-grid">
+    <label class="drop" id="drop-early">
+      <input type="file" accept=".csv" id="file-early" hidden>
+      <span class="drop-period">Earlier period</span>
+      <span class="drop-cue" id="cue-early">Click or drop a CSV</span>
+      <span class="drop-file" id="name-early"></span>
+    </label>
+    <div class="arrow">→</div>
+    <label class="drop" id="drop-late">
+      <input type="file" accept=".csv" id="file-late" hidden>
+      <span class="drop-period">Later period</span>
+      <span class="drop-cue" id="cue-late">Click or drop a CSV</span>
+      <span class="drop-file" id="name-late"></span>
+    </label>
+  </div>
+  <div class="label-row">
+    <div class="field"><label for="label-early">Earlier label</label><input type="text" id="label-early" placeholder="e.g. April"></div>
+    <div class="field"><label for="label-late">Later label</label><input type="text" id="label-late" placeholder="e.g. May"></div>
+  </div>
+</section>
+
+<!-- STAGE 2: CATEGORIES -->
+<section class="stage" id="cat-stage">
+  <div class="stage-index"><span>02</span><span class="stage-name">Define categories</span>
+    <label class="skip-toggle"><input type="checkbox" id="skip-cats"> <span>Skip — analyze without categories</span></label>
+  </div>
+  <p class="stage-note">A campaign joins a category if its name contains any of the terms below (case-insensitive). Comma-separate terms. Edit, remove, or add rows to match your account. Optional — you can run the report with no categories at all.</p>
+  <div id="cat-body">
+    <div id="cat-rows"></div>
+    <button class="ghost-btn" id="add-cat">+ Add category</button>
+  </div>
+</section>
+
+<div class="run-bar">
+  <button class="run-btn" id="run" disabled>Analyze month over month</button>
+  <span class="run-hint" id="run-hint">Load both files to continue</span>
+</div>
+
+<!-- STAGE 3: RESULTS -->
+<main id="results" hidden>
+
+  <section class="stage results-head">
+    <div class="stage-index"><span>03</span><span class="stage-name" id="period-name">Results</span></div>
+    <div class="head-actions">
+      <button class="ghost-btn" id="reset">↺ Reset</button>
+      <button class="ghost-btn" id="export">↓ Export Excel workbook</button>
+    </div>
+  </section>
+
+  <!-- Channel scope -->
+  <section class="scope-bar">
+    <span class="scope-label">Channel</span>
+    <div class="scope-toggle" id="scope-toggle">
+      <button class="scope-opt active" data-scope="all">All</button>
+      <button class="scope-opt" data-scope="ppc">PPC only <span class="scope-count" id="count-ppc"></span></button>
+      <button class="scope-opt" data-scope="dsp">DSP only <span class="scope-count" id="count-dsp"></span></button>
+      <button class="scope-opt" data-scope="other">Others <span class="scope-count" id="count-other"></span></button>
+    </div>
+    <span class="scope-note">PPC = starts PLTFRM | … with | NB | or | B | · DSP = dated or conversion/consideration/STV · Others = anything else</span>
+  </section>
+
+  <!-- Headline cards -->
+  <section class="cards" id="headline-cards"></section>
+
+  <!-- Overall + NB table -->
+  <section class="block">
+    <h2 class="block-title">Overall &amp; new-to-brand</h2>
+    <div class="table-wrap" id="summary-table"></div>
+  </section>
+
+  <!-- Category -->
+  <section class="block" id="cat-block">
+    <h2 class="block-title">By category</h2>
+    <div class="chart-frame"><canvas id="cat-chart"></canvas></div>
+    <div class="table-wrap" id="cat-table"></div>
+    <p class="caption" id="cat-caption"></p>
+  </section>
+
+  <!-- Movers -->
+  <section class="block">
+    <h2 class="block-title">Campaign movers <span class="block-sub">— click a column to sort</span></h2>
+    <div class="movers-controls">
+      <input type="text" id="movers-search" class="movers-search" placeholder="Filter campaigns…">
+      <span class="movers-count" id="movers-count"></span>
+    </div>
+    <div class="table-wrap" id="movers-table"></div>
+    <button class="ghost-btn" id="toggle-movers">Show all campaigns</button>
+  </section>
+
+  <!-- Recommendations -->
+  <section class="block">
+    <h2 class="block-title">Recommendations <span class="block-sub">— excludes <code>| B |</code> campaigns</span></h2>
+    <div class="rec-grid">
+      <div class="rec-col">
+        <div class="rec-head pause">Pause / cut</div>
+        <div id="pause-list"></div>
+      </div>
+      <div class="rec-col">
+        <div class="rec-head lean">Lean in</div>
+        <div id="lean-list"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-rule"></div>
+  <span class="footer-mark">PLTFRM</span>
+  <span class="footer-note">Runs entirely in your browser · no data leaves this page</span>
+</footer>
+
+<script>
+/* ---- error-guard.js ---- */
+/* Surfaces load/runtime errors visibly instead of failing silently.
+   Loaded after the vendor scripts and before the page's own app script. */
+(function () {
+  const banner = document.getElementById("err-banner");
+  if (!banner) return;
+  const show = (msg) => {
+    banner.hidden = false;
+    banner.textContent = msg;
+  };
+  if (window.__vendorError) {
+    show(`A required script (${window.__vendorError}) failed to load, so uploads and analysis won't work. Check that the "vendor" folder was deployed alongside this page, or try reloading.`);
+    return;
+  }
+  const missing = [];
+  if (typeof Papa === "undefined") missing.push("PapaParse");
+  if (typeof XLSX === "undefined") missing.push("SheetJS/XLSX");
+  if (missing.length) {
+    show(`Missing librar${missing.length > 1 ? "ies" : "y"}: ${missing.join(", ")}. Uploads and export won't work until this is fixed — check the "vendor" folder was deployed.`);
+  }
+  window.addEventListener("error", (e) => {
+    show(`Something broke: ${e.message} (${e.filename ? e.filename.split("/").pop() : ""}:${e.lineno || ""}). Reloading the page or clearing the site's stored session data may help.`);
+  });
+})();
+
+</script>
+<script>
+/* ---- analysis.js ---- */
+/* CAC MoM analysis — faithful port of the cac-mom-analysis skill's analyze.py.
+   Pure functions; no DOM. Mirrors the skill's definitions exactly:
+   - CAC always recomputed from summed cost / summed NTB (never the per-row column)
+   - | NB | filter for NB-only; | B | excluded from recommendations only
+   - currency/space stripping; truncated-header tolerance; n/a on zero NTB        */
+
+const NB_RE = /\|\s*NB\s*\|/;
+const B_RE = /\|\s*B\s*\|/;
+// DSP: a leading number (date prefix) OR a DSP funnel keyword.
+// Channel classification rules:
+//  PPC  : starts with "PLTFRM |", contains | B | or | NB |, and has SP/SB/SBV/SD as a token
+//  DSP  : starts with a date (leading digit) OR contains conversion/consideration/streaming tv/STV
+//  Other: anything that matches neither
+// Channel classification rules (confirmed):
+//  PPC  : starts with "PLTFRM |" AND has | B | or | NB |
+//  DSP  : starts with a date (leading digit) OR contains conversion/consideration/streaming tv/STV
+//  Other: matches neither — OR matches BOTH (ambiguous), so it gets surfaced rather than hidden
+const PPC_PREFIX_RE = /^\s*PLTFRM\s*\|/i;
+const PPC_TAG_RE = /\|\s*B\s*\||\|\s*NB\s*\|/;
+const DSP_KW_RE = /consideration|conversion|stv|streaming\s*tv/i;
+const DSP_LEADNUM_RE = /^\s*\d/;
+
+function cleanNum(v) {
+  if (v === null || v === undefined) return 0;
+  const s = String(v).replace(/[$,]/g, "").trim();
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+// Normalize one parsed CSV (array of row objects) into clean records.
+function normalize(rows) {
+  // headers may have stray spaces; build a trimmed-key lookup per row
+  return rows.map((raw) => {
+    const r = {};
+    for (const k in raw) r[k.trim()] = raw[k];
+    return {
+      campaign: String(r["campaign"] ?? ""),
+      spend: cleanNum(r["total_cost"]),
+      ntb: cleanNum(r["new_to_brand_purchases"]),
+      ntb_sales: cleanNum(r["new_to_brand_product_sales"]),
+      non_ntb: cleanNum(r["non_new_to_brand_purchases"]),
+      non_ntb_sales: cleanNum(r["non_new_to_brand_product_sales"]),
+    };
+  }).filter((r) => r.campaign && r.campaign.trim() !== "" && r.campaign.trim().toLowerCase() !== "undefined");
+}
+
+function isNB(name) { return NB_RE.test(name); }
+function isB(name) { return B_RE.test(name); }
+function isPPC(name) {
+  return PPC_PREFIX_RE.test(name) && PPC_TAG_RE.test(name);
+}
+function isDSP(name) { return DSP_LEADNUM_RE.test(name) || DSP_KW_RE.test(name); }
+// A campaign matching BOTH patterns is ambiguous -> Others (so it's flagged, not silently bucketed).
+function classifyChannel(name) {
+  const ppc = isPPC(name), dsp = isDSP(name);
+  if (ppc && dsp) return "other";
+  if (ppc) return "ppc";
+  if (dsp) return "dsp";
+  return "other";
+}
+
+// Aggregate a set of records → metrics. CAC recomputed from totals.
+function agg(records) {
+  let spend = 0, ntb = 0, ntbSales = 0, nonNtb = 0, nonNtbSales = 0;
+  for (const r of records) {
+    spend += r.spend; ntb += r.ntb; ntbSales += r.ntb_sales;
+    nonNtb += r.non_ntb; nonNtbSales += (r.non_ntb_sales || 0);
+  }
+  const totalPurch = ntb + nonNtb;
+  const totalSales = ntbSales + nonNtbSales;
+  return {
+    spend: round2(spend),
+    ntb_purchases: Math.round(ntb),
+    ntb_sales: round2(ntbSales),
+    total_sales: round2(totalSales),
+    cac: ntb > 0 ? round2(spend / ntb) : null,
+    ntb_pct: totalPurch > 0 ? round2(100 * ntb / totalPurch) : null,
+    roas: spend > 0 ? round2(totalSales / spend) : null,       // overall: total sales / spend
+    ntb_roas: spend > 0 ? round2(ntbSales / spend) : null,     // NTB sales / spend
+  };
+}
+
+function delta(a, b) {
+  const out = {};
+  for (const k of ["spend", "ntb_purchases", "ntb_sales", "cac", "ntb_pct", "roas", "ntb_roas"]) {
+    const av = a[k], bv = b[k];
+    if (av === null || bv === null || av === undefined || bv === undefined) {
+      out[k] = { abs: null, pct: null };
+    } else {
+      out[k] = { abs: round2(bv - av), pct: av !== 0 ? round1(100 * (bv - av) / av) : null };
+    }
+  }
+  return out;
+}
+
+function categoryRows(early, late, categories) {
+  const rows = {};
+  for (const cat in categories) {
+    const terms = categories[cat].map((t) => t.toLowerCase()).filter(Boolean);
+    const match = (recs) => recs.filter((r) => {
+      const n = r.campaign.toLowerCase();
+      return terms.some((t) => n.includes(t));
+    });
+    const e = agg(match(early)), l = agg(match(late));
+    rows[cat] = { early: e, late: l, delta: delta(e, l) };
+  }
+  return rows;
+}
+
+function perCampaign(records) {
+  const map = new Map();
+  for (const r of records) {
+    if (!map.has(r.campaign)) map.set(r.campaign, { spend: 0, ntb: 0, ntb_sales: 0, total_sales: 0 });
+    const m = map.get(r.campaign);
+    m.spend += r.spend; m.ntb += r.ntb;
+    m.ntb_sales += r.ntb_sales;
+    m.total_sales += r.ntb_sales + r.non_ntb_sales;
+  }
+  return map;
+}
+
+function campaignMovers(early, late) {
+  const e = perCampaign(early), l = perCampaign(late);
+  const names = new Set([...e.keys(), ...l.keys()]);
+  const recs = [];
+  for (const c of names) {
+    const ev = e.get(c) || { spend: 0, ntb: 0, ntb_sales: 0, total_sales: 0 };
+    const lv = l.get(c) || { spend: 0, ntb: 0, ntb_sales: 0, total_sales: 0 };
+    const ecac = ev.ntb > 0 ? ev.spend / ev.ntb : null;
+    const lcac = lv.ntb > 0 ? lv.spend / lv.ntb : null;
+    // NTB % of sales — most recent (late) period only, per the spec
+    const ntb_pct_sales_late = lv.total_sales > 0 ? round2(100 * lv.ntb_sales / lv.total_sales) : null;
+    recs.push({
+      campaign: c, is_nb: isNB(c), is_b: isB(c),
+      spend_early: round2(ev.spend), spend_late: round2(lv.spend),
+      ntb_early: Math.round(ev.ntb), ntb_late: Math.round(lv.ntb),
+      sales_early: round2(ev.total_sales), sales_late: round2(lv.total_sales),
+      ntb_sales_early: round2(ev.ntb_sales), ntb_sales_late: round2(lv.ntb_sales),
+      ntb_pct_sales_late,
+      cac_early: ecac !== null ? round2(ecac) : null,
+      cac_late: lcac !== null ? round2(lcac) : null,
+      cac_delta: (ecac !== null && lcac !== null) ? round2(lcac - ecac) : null,
+      spend_delta: round2(lv.spend - ev.spend),
+      sales_delta: round2(lv.total_sales - ev.total_sales),
+      ntb_sales_delta: round2(lv.ntb_sales - ev.ntb_sales),
+    });
+  }
+  return recs;
+}
+
+function recommendations(movers, benchmark) {
+  const elig = movers.filter((m) => !m.is_b);
+  const pause = [], lean = [];
+  for (const m of elig) {
+    const ls = m.spend_late, lcac = m.cac_late, lnb = m.ntb_late;
+    if (ls >= 1000 && (lnb === 0 || (lcac !== null && lcac > 1.8 * benchmark))) {
+      const reason = lnb === 0 ? "no NTB on meaningful spend" : `CAC $${Math.round(lcac)} vs ~$${Math.round(benchmark)} benchmark`;
+      pause.push({ ...m, reason });
+    } else if (ls >= 1000 && lcac !== null && lcac < 0.8 * benchmark) {
+      const trend = m.spend_delta > 0 ? "scaling" : "efficient, has headroom";
+      lean.push({ ...m, reason: `CAC $${Math.round(lcac)} (${trend})` });
+    }
+  }
+  pause.sort((a, b) => (b.cac_late ?? 0) - (a.cac_late ?? 0));
+  lean.sort((a, b) => (a.cac_late ?? 9e9) - (b.cac_late ?? 9e9));
+  return { pause, lean };
+}
+
+// Build overall + NB summary for an arbitrary subset of records.
+function scopeSummary(early, late) {
+  const overall = { early: agg(early), late: agg(late) };
+  overall.delta = delta(overall.early, overall.late);
+  const nbE = early.filter((r) => isNB(r.campaign));
+  const nbL = late.filter((r) => isNB(r.campaign));
+  const nb = { early: agg(nbE), late: agg(nbL) };
+  nb.delta = delta(nb.early, nb.late);
+  return { overall, nb };
+}
+
+// Top-level: takes normalized early/late record arrays + category map.
+function analyze(early, late, categories, labels) {
+  // Channel split: PPC / DSP / Other
+  const byCh = (recs, ch) => recs.filter((r) => classifyChannel(r.campaign) === ch);
+  const ppcEarly = byCh(early, "ppc"), ppcLate = byCh(late, "ppc");
+  const dspEarly = byCh(early, "dsp"), dspLate = byCh(late, "dsp");
+  const othEarly = byCh(early, "other"), othLate = byCh(late, "other");
+
+  const scopes = {
+    all: scopeSummary(early, late),
+    ppc: scopeSummary(ppcEarly, ppcLate),
+    dsp: scopeSummary(dspEarly, dspLate),
+    other: scopeSummary(othEarly, othLate),
+  };
+  const counts = {
+    all: { early: early.length, late: late.length },
+    ppc: { early: ppcEarly.length, late: ppcLate.length },
+    dsp: { early: dspEarly.length, late: dspLate.length },
+    other: { early: othEarly.length, late: othLate.length },
+  };
+
+  // Per-DSP-campaign MoM summaries (full metrics via agg/delta), sorted by late spend.
+  const dspNames = new Set([...dspEarly, ...dspLate].map((r) => r.campaign));
+  const dspCampaigns = [...dspNames].map((name) => {
+    const e = early.filter((r) => r.campaign === name);
+    const l = late.filter((r) => r.campaign === name);
+    const ea = agg(e), la = agg(l);
+    return { name, early: ea, late: la, delta: delta(ea, la) };
+  }).sort((a, b) => (b.late.spend || 0) - (a.late.spend || 0));
+
+  // Per-Other-campaign MoM summaries (same treatment as DSP, shown as per-campaign rows).
+  const othNames = new Set([...othEarly, ...othLate].map((r) => r.campaign));
+  const otherCampaigns = [...othNames].map((name) => {
+    const e = early.filter((r) => r.campaign === name);
+    const l = late.filter((r) => r.campaign === name);
+    const ea = agg(e), la = agg(l);
+    return { name, early: ea, late: la, delta: delta(ea, la) };
+  }).sort((a, b) => (b.late.spend || 0) - (a.late.spend || 0));
+
+  // Back-compat: top-level overall/nb mirror the "all" scope.
+  const overall = scopes.all.overall;
+  const nb = scopes.all.nb;
+
+  const cats = Object.keys(categories).length ? categoryRows(early, late, categories) : {};
+  const movers = campaignMovers(early, late).map((m) => ({ ...m, channel: classifyChannel(m.campaign), is_dsp: classifyChannel(m.campaign) === "dsp" }));
+  const benchmark = nb.late.cac || overall.late.cac || 30;
+  const recs = recommendations(movers, benchmark);
+
+  return { labels, overall, nb, scopes, counts, dspCampaigns, otherCampaigns, categories: cats, movers, benchmark: round2(benchmark), recommendations: recs };
+}
+
+function round1(n) { return Math.round(n * 10) / 10; }
+function round2(n) { return Math.round(n * 100) / 100; }
+
+// expose
+window.CAC = { normalize, analyze, agg, delta, isNB, isB, isDSP, isPPC, classifyChannel };
+
+</script>
+<script>
+/* ---- app.js ---- */
+/* UI + rendering for the CAC MoM analyzer. Analysis logic lives in analysis.js. */
+
+const state = {
+  earlyRaw: null, lateRaw: null,
+  earlyRecs: null, lateRecs: null,
+  result: null, showAllMovers: false, chart: null, scope: "all",
+  moverSort: { key: "cac_delta", dir: "desc" }, moverQuery: "",
+};
+
+// Categories start blank so each user adds their own (no presets to clear out).
+const STARTING_CATEGORY_ROWS = 3;
+
+/* ---------- file handling ---------- */
+function wireDrop(side) {
+  const input = document.getElementById(`file-${side}`);
+  const drop = document.getElementById(`drop-${side}`);
+  const cue = document.getElementById(`cue-${side}`);
+  const nameEl = document.getElementById(`name-${side}`);
+
+  const applyRecords = (recs, label) => {
+    if (side === "early") { state.earlyRecs = recs; }
+    else { state.lateRecs = recs; }
+    cue.textContent = `${recs.length} campaigns`;
+    nameEl.textContent = label;
+    drop.classList.add("loaded");
+    updateRunState();
+  };
+
+  const handle = (file) => {
+    if (!file) return;
+    Papa.parse(file, {
+      header: true, skipEmptyLines: true,
+      complete: (res) => applyRecords(window.CAC.normalize(res.data), file.name),
+      error: () => { cue.textContent = "Couldn't read that file"; },
+    });
+  };
+
+  input.addEventListener("change", (e) => handle(e.target.files[0]));
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("drag"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault(); drop.classList.remove("drag");
+    handle(e.dataTransfer.files[0]);
+  });
+}
+wireDrop("early"); wireDrop("late");
+
+/* ---------- categories UI ---------- */
+const catRows = document.getElementById("cat-rows");
+function addCatRow(name = "", terms = "") {
+  const row = document.createElement("div");
+  row.className = "cat-row";
+  row.innerHTML = `
+    <input type="text" class="cat-name" placeholder="Category" value="${escapeAttr(name)}">
+    <input type="text" class="cat-terms" placeholder="terms, comma, separated" value="${escapeAttr(terms)}">
+    <button class="cat-del" title="Remove">×</button>`;
+  row.querySelector(".cat-del").addEventListener("click", () => row.remove());
+  catRows.appendChild(row);
+}
+for (let i = 0; i < STARTING_CATEGORY_ROWS; i++) addCatRow();
+document.getElementById("add-cat").addEventListener("click", () => addCatRow());
+
+document.getElementById("skip-cats").addEventListener("change", (e) => {
+  document.getElementById("cat-body").style.display = e.target.checked ? "none" : "";
+});
+
+function readCategories() {
+  if (document.getElementById("skip-cats").checked) return {};
+  const cats = {};
+  catRows.querySelectorAll(".cat-row").forEach((row) => {
+    const name = row.querySelector(".cat-name").value.trim();
+    const terms = row.querySelector(".cat-terms").value.split(",").map((t) => t.trim()).filter(Boolean);
+    if (name && terms.length) cats[name] = terms;
+  });
+  return cats;
+}
+
+/* ---------- run ---------- */
+function updateRunState() {
+  const ready = state.earlyRecs && state.lateRecs;
+  const btn = document.getElementById("run");
+  btn.disabled = !ready;
+  document.getElementById("run-hint").textContent = ready ? "Ready" : "Load both files to continue";
+}
+
+document.getElementById("run").addEventListener("click", () => {
+  const labels = {
+    early: document.getElementById("label-early").value.trim() || "Earlier",
+    late: document.getElementById("label-late").value.trim() || "Later",
+  };
+  state.result = window.CAC.analyze(state.earlyRecs, state.lateRecs, readCategories(), labels);
+  state.scope = "all";
+  state.moverSort = { key: "cac_delta", dir: "desc" };
+  state.moverQuery = "";
+  const ms = document.getElementById("movers-search"); if (ms) ms.value = "";
+  document.querySelectorAll(".scope-opt").forEach((b) => b.classList.toggle("active", b.dataset.scope === "all"));
+  saveSession();
+  render();
+  document.getElementById("results").hidden = false;
+  if (!state.restoring) document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+});
+
+/* ---------- session persistence (survives page navigation within the tab) ---------- */
+const MOM_KEY = "cacMomState_v1";
+function saveSession() {
+  try {
+    const cats = [];
+    catRows.querySelectorAll(".cat-row").forEach((row) => {
+      cats.push({ name: row.querySelector(".cat-name").value, terms: row.querySelector(".cat-terms").value });
+    });
+    sessionStorage.setItem(MOM_KEY, JSON.stringify({
+      earlyRecs: state.earlyRecs, lateRecs: state.lateRecs,
+      labels: {
+        early: document.getElementById("label-early").value,
+        late: document.getElementById("label-late").value,
+      },
+      names: {
+        early: document.getElementById("name-early").textContent,
+        late: document.getElementById("name-late").textContent,
+      },
+      cats, skip: document.getElementById("skip-cats").checked,
+    }));
+  } catch (e) { /* storage unavailable: silently skip */ }
+}
+
+function restoreSession() {
+  let saved;
+  try { saved = JSON.parse(sessionStorage.getItem(MOM_KEY)); } catch (e) { return; }
+  if (!saved || !saved.earlyRecs || !saved.lateRecs) return;
+
+  state.earlyRecs = saved.earlyRecs; state.lateRecs = saved.lateRecs;
+  document.getElementById("label-early").value = saved.labels.early || "";
+  document.getElementById("label-late").value = saved.labels.late || "";
+
+  // restore file "loaded" cues
+  const setLoaded = (side, name, recs) => {
+    document.getElementById(`cue-${side}`).textContent = `${recs.length} campaigns`;
+    document.getElementById(`name-${side}`).textContent = name || "";
+    document.getElementById(`drop-${side}`).classList.add("loaded");
+  };
+  setLoaded("early", saved.names && saved.names.early, saved.earlyRecs);
+  setLoaded("late", saved.names && saved.names.late, saved.lateRecs);
+
+  // restore categories
+  if (saved.cats && saved.cats.length) {
+    catRows.innerHTML = "";
+    saved.cats.forEach((c) => addCatRow(c.name, c.terms));
+  }
+  if (saved.skip) {
+    document.getElementById("skip-cats").checked = true;
+    document.getElementById("cat-body").style.display = "none";
+  }
+
+  updateRunState();
+  // re-run the analysis silently (no scroll) so it's on screen after navigating back
+  state.restoring = true;
+  document.getElementById("run").click();
+  state.restoring = false;
+}
+
+function resetAll() {
+  try { sessionStorage.removeItem(MOM_KEY); } catch (e) {}
+  state.earlyRaw = state.lateRaw = state.earlyRecs = state.lateRecs = state.result = null;
+  ["early", "late"].forEach((side) => {
+    document.getElementById(`file-${side}`).value = "";
+    document.getElementById(`cue-${side}`).textContent = "Click or drop a CSV";
+    document.getElementById(`name-${side}`).textContent = "";
+    document.getElementById(`drop-${side}`).classList.remove("loaded");
+  });
+  document.getElementById("label-early").value = "";
+  document.getElementById("label-late").value = "";
+  catRows.innerHTML = "";
+  for (let i = 0; i < STARTING_CATEGORY_ROWS; i++) addCatRow();
+  document.getElementById("skip-cats").checked = false;
+  document.getElementById("cat-body").style.display = "";
+  document.getElementById("results").hidden = true;
+  updateRunState();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+const resetBtn = document.getElementById("reset");
+if (resetBtn) resetBtn.addEventListener("click", resetAll);
+
+/* ---------- formatting helpers ---------- */
+const money = (n) => n === null ? "n/a" : (Math.abs(n) >= 1000 ? "$" + (n / 1000).toFixed(1) + "K" : "$" + n.toFixed(0));
+const moneyFull = (n) => n === null ? "n/a" : "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+const cac = (n) => n === null ? "n/a" : "$" + n.toFixed(2);
+const pct = (n) => n === null ? "n/a" : n.toFixed(1) + "%";
+const num = (n) => n === null ? "n/a" : Math.round(n).toLocaleString("en-US");
+const roasFmt = (n) => n === null ? "n/a" : n.toFixed(2) + "x";
+
+// direction: which way is "good" for a metric
+const GOOD_DOWN = new Set(["cac"]);
+function deltaClass(metric, d) {
+  if (d.abs === null || d.abs === 0) return "flat";
+  const rising = d.abs > 0;
+  if (metric === "spend") return "flat";
+  if (GOOD_DOWN.has(metric)) return rising ? "down" : "up";
+  return rising ? "up" : "down";
+}
+function deltaText(metric, d) {
+  if (d.abs === null) return "—";
+  const sign = d.abs > 0 ? "+" : "";
+  const base = metric === "cac" ? `${sign}$${d.abs.toFixed(2)}`
+    : metric === "ntb_pct" ? `${sign}${d.abs.toFixed(1)}pt`
+    : (metric === "roas" || metric === "ntb_roas") ? `${sign}${d.abs.toFixed(2)}x`
+    : metric === "ntb_purchases" ? `${sign}${num(d.abs)}`
+    : `${sign}${money(d.abs)}`;
+  return d.pct !== null ? `${base} · ${sign}${d.pct}%` : base;
+}
+function escapeAttr(s){return String(s).replace(/"/g,"&quot;");}
+function escapeHtml(s){return String(s).replace(/[&<>]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+/* ---------- render ---------- */
+function render() {
+  const r = state.result;
+  document.getElementById("period-name").textContent = `${r.labels.early} → ${r.labels.late}`;
+  document.getElementById("count-ppc").textContent = r.counts.ppc.late;
+  document.getElementById("count-dsp").textContent = r.counts.dsp.late;
+  const co = document.getElementById("count-other"); if (co) co.textContent = r.counts.other.late;
+  renderScope(r); renderCategories(r); renderMovers(r); renderRecs(r);
+}
+
+// cards + summary for the currently selected channel scope
+function renderScope(r) {
+  const scope = state.scope || "all";
+  const s = r.scopes[scope];
+  renderCards(r, s, scope);
+  renderSummary(r, s);
+}
+
+const SCOPE_NAME = { all: "All channels", ppc: "PPC only", dsp: "DSP only", other: "Others" };
+
+function renderCards(r, s, scope) {
+  const o = s.overall, n = s.nb;
+  const cacLabel = scope === "dsp" ? "DSP CAC" : scope === "ppc" ? "PPC CAC" : scope === "other" ? "Others CAC" : "Overall CAC";
+  // second card: NB CAC for All/PPC; for DSP/Other show campaign count (NB is usually n/a there)
+  let secondCard;
+  if (scope === "dsp" || scope === "other") {
+    const key = scope;
+    const label = scope === "dsp" ? "DSP campaigns" : "Other campaigns";
+    secondCard = { label, val: String(r.counts[key].late), flow: `${r.counts[key].early} →`, m: "count", d: { abs: r.counts[key].late - r.counts[key].early, pct: null } };
+  } else {
+    secondCard = { label: "NB CAC", val: cac(n.late.cac), flow: `${cac(n.early.cac)} →`, m: "cac", d: n.delta.cac };
+  }
+  const cards = [
+    { label: cacLabel, val: cac(o.late.cac), flow: `${cac(o.early.cac)} →`, m: "cac", d: o.delta.cac },
+    secondCard,
+    { label: `Spend`, val: money(o.late.spend), flow: `${money(o.early.spend)} →`, m: "spend", d: o.delta.spend },
+    { label: `ROAS`, val: roasFmt(o.late.roas), flow: `${roasFmt(o.early.roas)} →`, m: "roas", d: o.delta.roas },
+    { label: `NTB ROAS`, val: roasFmt(o.late.ntb_roas), flow: `${roasFmt(o.early.ntb_roas)} →`, m: "ntb_roas", d: o.delta.ntb_roas },
+  ];
+  document.getElementById("headline-cards").innerHTML = cards.map((c) => {
+    let deltaHtml;
+    if (c.m === "count") {
+      const dd = c.d.abs;
+      deltaHtml = `<div class="card-delta flat">${dd > 0 ? "+" + dd : dd < 0 ? dd : "no change"}${dd !== 0 ? " campaign" + (Math.abs(dd) === 1 ? "" : "s") : ""}</div>`;
+    } else {
+      deltaHtml = `<div class="card-delta ${deltaClass(c.m, c.d)}">${deltaText(c.m, c.d)}</div>`;
+    }
+    return `
+    <div class="card">
+      <div class="card-label">${c.label}</div>
+      <div class="card-val">${c.val}</div>
+      <div class="card-flow">${c.flow}</div>
+      ${deltaHtml}
+    </div>`;
+  }).join("");
+}
+
+const METRICS = [["spend","Spend"],["ntb_purchases","NTB purch"],["ntb_sales","NTB sales"],["cac","CAC"],["ntb_pct","NTB %"],["roas","ROAS"],["ntb_roas","NTB ROAS"]];
+function fmtMetric(key, v){
+  if(key==="cac")return cac(v); if(key==="spend"||key==="ntb_sales")return moneyFull(v);
+  if(key==="ntb_pct")return pct(v); if(key==="roas"||key==="ntb_roas")return v===null?"n/a":v.toFixed(2)+"x";
+  return num(v);
+}
+
+function renderSummary(r, s) {
+  const scope = state.scope || "all";
+  const seg = (label, data) => METRICS.map(([k, name], i) => `
+    <tr>
+      ${i === 0 ? `<td class="seg-label" rowspan="${METRICS.length}">${escapeHtml(label)}</td>` : ""}
+      <td class="metric-name">${name}</td>
+      <td class="muted">${fmtMetric(k, data.early[k])}</td>
+      <td>${fmtMetric(k, data.late[k])}</td>
+      <td class="${deltaClass(k, data.delta[k])}">${deltaText(k, data.delta[k])}</td>
+    </tr>`).join("");
+
+  let body = seg("Overall", s.overall);
+  let extraNote = "";
+  if (scope === "ppc") {
+    body += seg("NB only", s.nb);
+  } else if (scope === "dsp") {
+    // replace the (empty) NB block with one segment per DSP campaign
+    body += r.dspCampaigns.map((c) => seg(shortName(c.name), c)).join("");
+    extraNote = `<p class="caption">Each DSP campaign shown month over month. ${r.dspCampaigns.length} campaign${r.dspCampaigns.length === 1 ? "" : "s"} classified as DSP.</p>`;
+  } else if (scope === "other") {
+    body += r.otherCampaigns.map((c) => seg(shortName(c.name), c)).join("");
+    extraNote = `<p class="caption">Campaigns that don't match the PPC or DSP naming rules (e.g. a misspelled prefix or a different vendor). ${r.otherCampaigns.length} campaign${r.otherCampaigns.length === 1 ? "" : "s"} in Others — worth checking the names.</p>`;
+  }
+
+  document.getElementById("summary-table").innerHTML = `
+    <table>
+      <thead><tr><th>Segment</th><th>Metric</th><th>${r.labels.early}</th><th>${r.labels.late}</th><th>Δ</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>${extraNote}`;
+}
+
+function renderCategories(r) {
+  const cats = r.categories; const names = Object.keys(cats);
+  const block = document.getElementById("cat-block");
+  if (!names.length) {
+    block.hidden = true;
+    if (state.chart) { state.chart.destroy(); state.chart = null; }
+    return;
+  }
+  block.hidden = false;
+  const rows = names.map((c) => {
+    const d = cats[c];
+    return `<tr>
+      <td class="seg-label">${escapeHtml(c)}</td>
+      <td class="muted">${money(d.early.spend)}</td><td>${money(d.late.spend)}</td>
+      <td class="muted">${money(d.early.ntb_sales)}</td><td>${money(d.late.ntb_sales)}</td>
+      <td class="muted">${cac(d.early.cac)}</td><td>${cac(d.late.cac)}</td>
+      <td class="${deltaClass("cac", d.delta.cac)}">${deltaText("cac", d.delta.cac)}</td>
+    </tr>`;
+  }).join("");
+  document.getElementById("cat-table").innerHTML = `
+    <table>
+      <thead><tr><th>Category</th>
+        <th>Spend ${r.labels.early}</th><th>${r.labels.late}</th>
+        <th>NTB sales ${r.labels.early}</th><th>${r.labels.late}</th>
+        <th>CAC ${r.labels.early}</th><th>${r.labels.late}</th><th>CAC Δ</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  // caption: biggest CAC driver
+  let worst = null;
+  names.forEach((c) => { const d = cats[c].delta.cac.abs; if (d !== null && (worst === null || d > cats[worst].delta.cac.abs)) worst = c; });
+  if (worst !== null && cats[worst].delta.cac.abs > 0) {
+    const w = cats[worst];
+    const np = w.delta.ntb_purchases.abs;
+    document.getElementById("cat-caption").textContent =
+      `${worst} drove the largest CAC increase (${deltaText("cac", w.delta.cac)}). Spend moved ${deltaText("spend", w.delta.spend)} while NTB purchases moved ${np>=0?"+":""}${num(np)} — ${np<=0?"incremental dollars bought no net-new customers.":"some of the added spend converted."}`;
+  } else { document.getElementById("cat-caption").textContent = ""; }
+
+  renderCatChart(r);
+}
+
+function renderCatChart(r) {
+  const names = Object.keys(r.categories);
+  const early = names.map((c) => r.categories[c].early.cac ?? 0);
+  const late = names.map((c) => r.categories[c].late.cac ?? 0);
+  const ctx = document.getElementById("cat-chart");
+  if (state.chart) state.chart.destroy();
+  const css = getComputedStyle(document.documentElement);
+  state.chart = new Chart(ctx, {
+    type: "bar",
+    data: { labels: names, datasets: [
+      { label: `CAC ${r.labels.early}`, data: early, backgroundColor: "#3a3a3a" },
+      { label: `CAC ${r.labels.late}`, data: late, backgroundColor: "#e7e7e7" },
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: "#8a8a8a", font: { family: "Archivo", size: 11 } } } },
+      scales: {
+        x: { ticks: { color: "#cfcfcf", font: { family: "Newsreader", size: 13 } }, grid: { display: false } },
+        y: { ticks: { color: "#6e6e6e", callback: (v) => "$" + v }, grid: { color: "#1d1d1d" } },
+      },
+    },
+  });
+}
+
+// Column definitions for the movers table.
+// key: sort key on the record; label uses {E}/{L} placeholders for period labels.
+// type controls formatting + good-direction for delta coloring.
+const MOVER_COLS = [
+  { id: "campaign", label: "Campaign", type: "text", align: "left" },
+  { id: "spend_late", label: "Spend {L}", type: "money" },
+  { id: "spend_delta", label: "Spend Δ", type: "money_delta", good: "none" },
+  { id: "sales_late", label: "Sales {L}", type: "money" },
+  { id: "sales_delta", label: "Sales Δ", type: "money_delta", good: "up" },
+  { id: "ntb_sales_late", label: "NTB sales {L}", type: "money" },
+  { id: "ntb_sales_delta", label: "NTB sales Δ", type: "money_delta", good: "up" },
+  { id: "ntb_pct_sales_late", label: "NTB % of sales", type: "pct" },
+  { id: "cac_late", label: "CAC {L}", type: "cac" },
+  { id: "cac_delta", label: "CAC Δ", type: "cac_delta", good: "down" },
+];
+
+function moverCell(m, col) {
+  const v = m[col.id];
+  switch (col.type) {
+    case "text":
+      return `${escapeHtml(shortName(m.campaign))}${m.is_nb ? '<span class="flag nb">NB</span>' : ""}${m.is_b ? '<span class="flag b">B</span>' : ""}${m.is_dsp ? '<span class="flag dsp">DSP</span>' : ""}`;
+    case "money": return money(v);
+    case "cac": return cac(v);
+    case "pct": return v === null ? "n/a" : v.toFixed(1) + "%";
+    case "money_delta": {
+      if (v === null) return "—";
+      const cls = col.good === "none" ? "flat" : (v > 0 ? (col.good === "up" ? "up" : "down") : v < 0 ? (col.good === "up" ? "down" : "up") : "flat");
+      return `<span class="${cls}">${v > 0 ? "+" : ""}${money(v)}</span>`;
+    }
+    case "cac_delta": {
+      if (v === null) return "—";
+      const cls = v > 0 ? "down" : v < 0 ? "up" : "flat";
+      return `<span class="${cls}">${v > 0 ? "+" : ""}$${v.toFixed(2)}</span>`;
+    }
+    default: return v ?? "";
+  }
+}
+
+function renderMovers(r) {
+  const sort = state.moverSort; // {key, dir}
+  const q = (state.moverQuery || "").toLowerCase();
+
+  let list = [...r.movers];
+  if (q) list = list.filter((m) => m.campaign.toLowerCase().includes(q));
+
+  // sort
+  const { key, dir } = sort;
+  const mult = dir === "asc" ? 1 : -1;
+  list.sort((a, b) => {
+    let av = a[key], bv = b[key];
+    if (key === "campaign") return mult * String(av).localeCompare(String(bv));
+    // nulls always sort to the bottom regardless of direction
+    if (av === null && bv === null) return 0;
+    if (av === null) return 1;
+    if (bv === null) return -1;
+    return mult * (av - bv);
+  });
+
+  const total = list.length;
+  const shown = state.showAllMovers ? list : list.slice(0, 10);
+
+  const head = MOVER_COLS.map((c) => {
+    const label = c.label.replace("{E}", r.labels.early).replace("{L}", r.labels.late);
+    const active = c.id === key;
+    const caret = active ? (dir === "asc" ? " ▲" : " ▼") : "";
+    return `<th class="sortable${active ? " active" : ""}" data-key="${c.id}" style="text-align:${c.align === "left" ? "left" : "right"}">${label}${caret}</th>`;
+  }).join("");
+
+  const rows = shown.map((m) => `
+    <tr>${MOVER_COLS.map((c) => `<td${c.align === "left" ? "" : ""} class="${c.type === "money" || c.type === "cac" ? "muted-num" : ""}">${moverCell(m, c)}</td>`).join("")}</tr>`).join("");
+
+  document.getElementById("movers-table").innerHTML = `
+    <table class="movers">
+      <thead><tr>${head}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  document.getElementById("movers-count").textContent =
+    q ? `${total} match${total === 1 ? "" : "es"}` : `${total} campaigns`;
+  const btn = document.getElementById("toggle-movers");
+  btn.style.display = total > 10 ? "" : "none";
+  btn.textContent = state.showAllMovers ? "Show top 10 only" : `Show all ${total}`;
+
+  // wire header sort clicks (re-bound each render since innerHTML replaced them)
+  document.querySelectorAll("#movers-table th.sortable").forEach((th) => {
+    th.addEventListener("click", () => {
+      const k = th.dataset.key;
+      if (state.moverSort.key === k) {
+        state.moverSort.dir = state.moverSort.dir === "asc" ? "desc" : "asc";
+      } else {
+        state.moverSort.key = k;
+        // sensible default direction: text asc, numbers desc (biggest first)
+        state.moverSort.dir = k === "campaign" ? "asc" : "desc";
+      }
+      renderMovers(state.result);
+    });
+  });
+}
+
+document.getElementById("toggle-movers").addEventListener("click", () => {
+  state.showAllMovers = !state.showAllMovers; renderMovers(state.result);
+});
+document.getElementById("movers-search").addEventListener("input", (e) => {
+  state.moverQuery = e.target.value;
+  renderMovers(state.result);
+});
+
+// channel scope toggle
+document.getElementById("scope-toggle").addEventListener("click", (e) => {
+  const btn = e.target.closest(".scope-opt");
+  if (!btn) return;
+  state.scope = btn.dataset.scope;
+  document.querySelectorAll(".scope-opt").forEach((b) => b.classList.toggle("active", b === btn));
+  renderScope(state.result);
+});
+
+function renderRecs(r) {
+  const item = (m, kind) => `
+    <div class="rec-item ${kind}">
+      <div class="rec-name">${escapeHtml(shortName(m.campaign))}</div>
+      <div class="rec-reason">${money(m.spend_late)} spend · ${escapeHtml(m.reason)}</div>
+    </div>`;
+  const pause = r.recommendations.pause, lean = r.recommendations.lean;
+  document.getElementById("pause-list").innerHTML = pause.length ? pause.map((m) => item(m, "pause")).join("") : '<div class="rec-empty">Nothing flagged to pause.</div>';
+  document.getElementById("lean-list").innerHTML = lean.length ? lean.map((m) => item(m, "lean")).join("") : '<div class="rec-empty">Nothing flagged to lean into.</div>';
+}
+
+function shortName(c) { return c.replace(/^PLTFRM\s*\|\s*/, "").replace(/\s*\|\s*SP$/, ""); }
+
+/* ---------- Excel export (mirrors skill's 4 tabs) ---------- */
+document.getElementById("export").addEventListener("click", () => {
+  const r = state.result; const wb = XLSX.utils.book_new();
+  const el = r.labels.early, ll = r.labels.late;
+  const MET = [["spend","Spend $"],["ntb_purchases","NTB Purch"],["ntb_sales","NTB Sales $"],["cac","CAC $"],["ntb_pct","NTB %"],["roas","ROAS"],["ntb_roas","NTB ROAS"]];
+
+  // Summary — all channel scopes (All / PPC / DSP / Others), each with Overall + NB
+  const SCOPES = [["All channels", r.scopes.all], ["PPC only", r.scopes.ppc], ["DSP only", r.scopes.dsp], ["Others", r.scopes.other]];
+  const sum = [["Channel","Segment","Metric",el,ll,"Δ abs","Δ %"]];
+  SCOPES.forEach(([scopeName, s])=>{
+    [["Overall",s.overall],["NB-only (| NB |)",s.nb]].forEach(([seg,data])=>{
+      MET.forEach(([k,name])=>sum.push([scopeName,seg,name,data.early[k],data.late[k],data.delta[k].abs,data.delta[k].pct]));
+    });
+    sum.push([]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), "Summary");
+
+  // By Category
+  if (Object.keys(r.categories).length) {
+    const cat = [["Category","Metric",el,ll,"Δ abs","Δ %"]];
+    for (const c in r.categories){ const d=r.categories[c];
+      MET.forEach(([k,name])=>cat.push([c,name,d.early[k],d.late[k],d.delta[k].abs,d.delta[k].pct]));
+      cat.push([]);
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cat), "By Category");
+  }
+
+  // Campaign Movers
+  const mov = [["Campaign","NB?","B?","DSP?",`Spend ${el}`,`Spend ${ll}`,"Spend Δ",`NTB ${el}`,`NTB ${ll}`,`CAC ${el}`,`CAC ${ll}`,"CAC Δ"]];
+  [...r.movers].sort((a,b)=>Math.abs(b.cac_delta??0)-Math.abs(a.cac_delta??0)).forEach((m)=>{
+    mov.push([m.campaign,m.is_nb?"Y":"",m.is_b?"Y":"",m.is_dsp?"Y":"",m.spend_early,m.spend_late,m.spend_delta,m.ntb_early,m.ntb_late,m.cac_early,m.cac_late,m.cac_delta]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(mov), "Campaign Movers");
+
+  // Recommendations
+  const rec = [["Action","Campaign",`Spend ${ll}`,`CAC ${ll}`,`NTB ${ll}`,"Reason"]];
+  rec.push(["PAUSE / CUT — excludes | B |","","","","",""]);
+  r.recommendations.pause.forEach((m)=>rec.push(["Pause",m.campaign,m.spend_late,m.cac_late,m.ntb_late,m.reason]));
+  rec.push([]); rec.push(["LEAN IN — excludes | B |","","","","",""]);
+  r.recommendations.lean.forEach((m)=>rec.push(["Lean in",m.campaign,m.spend_late,m.cac_late,m.ntb_late,m.reason]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rec), "Recommendations");
+
+  XLSX.writeFile(wb, `CAC_MoM_${el}_to_${ll}.xlsx`);
+});
+
+// Restore any saved session AFTER all helpers are defined (avoids TDZ on const formatters).
+restoreSession();
+
+</script>
+<script>
+/* ---- query-campaign.js ---- */
+window.AMC_QUERY = "-- New-to-brand Purchases with Unique Reach (by Campaign)\nWITH dsp_campaigns (campaign_id) AS (\nVALUES\n-- Optional update: To apply display campaign filter to the query, add campaign IDs below and uncomment lines in the impressions cte and in the final select statement. Ignore section to skip filters.\n(1111111111111),\n(2222222222222)\n),\nsa_campaigns (campaign) AS (\nVALUES\n-- Optional update: To apply sponsored ads campaign filter to the query, add campaign names below and uncomment lines in the impressions cte and in the final select statement. Ignore section to skip filters.\n('SP Campaign 1'),\n('SP Campaign 2'),\n('SD Campaign 1'),\n('SD Campaign 2'),\n('SB Campaign 1'),\n('SB Campaign 2')\n),\n\naggregated as (\nSELECT\n      CASE WHEN ad_product_type is not null THEN 'Sponsored_ads'  else advertiser_id\n  end\n  as advertiser_id,\n  advertiser,\n  campaign_id_string as campaign_id,\n  campaign,\n  --EXTRACT(month FROM impression_date) as traffic_month,\n       CASE\n         WHEN traffic_event_subtype = 'AD_IMP' THEN EXTRACT(month FROM impression_date)\n         WHEN traffic_event_subtype = 'AD_CLICK' THEN EXTRACT(month FROM click_date)\n        end as traffic_month,\n  0 AS total_cost,\n  0 AS unique_users_reached,\n  SUM(new_to_brand_total_purchases) AS new_to_brand_purchases,\n  SUM(total_purchases) - SUM(new_to_brand_total_purchases) AS non_new_to_brand_purchases,\n  (SUM(new_to_brand_total_purchases) / SUM(total_purchases)) * 100 AS new_to_brand_purchases_percentage,\n  SUM(new_to_brand_total_product_sales) AS new_to_brand_product_sales,\n SUM(total_product_sales) - SUM(new_to_brand_total_product_sales) AS non_new_to_brand_product_sales,\n  (SUM(new_to_brand_total_product_sales) / SUM(total_product_sales)) * 100 AS new_to_brand_product_sales_percentage\nFROM\n  amazon_attributed_events_by_conversion_time\nWHERE\n user_id IS NOT NULL\n -- Optional update: uncomment this line to enable DSP & SA filters. Leave the line commented to skip filters\n --AND (campaign_id IN (SELECT campaign_id FROM dsp_campaigns) OR campaign IN (SELECT campaign FROM sa_campaigns))\nGROUP BY\n advertiser_id,\n  advertiser,\n  campaign_id,\n  campaign,\n  traffic_month\nUNION ALL\nSELECT\n  advertiser_id,\n  advertiser,\n  campaign_id,\n  campaign,\n  EXTRACT(month FROM impression_date) as traffic_month,\n --impression_cost and total_cost are reported in millicents. Divide by 100,000 to get the cost in dollars/your currency.\n  SUM(total_cost / 100000) AS total_cost,\n  COUNT(DISTINCT user_id) AS unique_users_reached,\n  0 AS new_to_brand_purchases,\n 0 AS non_new_to_brand_purchases,\n  0 AS new_to_brand_purchases_percentage,\n  0 AS new_to_brand_product_sales,\n  0 AS non_new_to_brand_product_sales,\n  0 AS new_to_brand_product_sales_percentage\nFROM\n  dsp_impressions\nWHERE\n  user_id IS NOT NULL\n -- Optional update: uncomment this line to enable DSP & SA filters. Leave the line commented to skip filters\n --AND (campaign_id IN (SELECT campaign_id FROM dsp_campaigns) OR campaign IN (SELECT campaign FROM sa_campaigns))\nGROUP BY\n  advertiser_id,\n  advertiser,\n  campaign_id,\n  campaign,\n  traffic_month\nUNION ALL\nSELECT\n   'Sponsored_ads'  as advertiser_id ,\n  advertiser,\n  campaign_id_string AS campaign_id,\n  campaign,\n  EXTRACT(month FROM event_date) as traffic_month,\n -- spend is reported as microcents. Divide by 100,000,000 to get the cost in dollars/your currency.\n  SUM(spend / 100000000) AS total_cost,\n  COUNT(DISTINCT user_id) AS unique_users_reached,\n  0 AS new_to_brand_purchases,\n  0 AS non_new_to_brand_purchases,\n  0 AS new_to_brand_purchases_percentage,\n  0 AS new_to_brand_product_sales,\n  0 AS non_new_to_brand_product_sales,\n  0 AS new_to_brand_product_sales_percentage\nFROM\n  sponsored_ads_traffic\nGROUP BY\n  advertiser_id,\n  advertiser,\n  campaign_id,\n  campaign,\n  traffic_month\n)\nSELECT\n advertiser_id,\n  advertiser,\n  campaign_id,\n  campaign,\n  SUM(unique_users_reached) AS unique_users_reached,\n  SUM(total_cost) AS total_cost,\n  SUM(new_to_brand_purchases) AS new_to_brand_purchases,\n  SUM(non_new_to_brand_purchases) AS non_new_to_brand_purchases,\n ROUND((SUM(new_to_brand_purchases) / (SUM(new_to_brand_purchases)+SUM(non_new_to_brand_purchases))) * 100,2) AS new_to_brand_purchases_percentage,\n  SUM(new_to_brand_product_sales) AS new_to_brand_product_sales,\n  SUM(non_new_to_brand_product_sales) AS non_new_to_brand_product_sales,\n ROUND((SUM(new_to_brand_product_sales) / (SUM(new_to_brand_product_sales)+SUM(non_new_to_brand_product_sales))) * 100,2) AS new_to_brand_product_sales_percentage\nFROM\n  aggregated\nGROUP BY\n advertiser_id,\n  advertiser,\n  campaign_id,\n  campaign\n";
+
+</script>
+<script>
+/* ---- copy-query.js ---- */
+/* Copy-query button — shared by both pages. Copies the text in #query-text
+   to the clipboard and gives brief button feedback. */
+(function () {
+  const btn = document.getElementById("copy-query");
+  const src = document.getElementById("query-text");
+  if (!btn || !src) return;
+  // If a query was supplied via window.AMC_QUERY, render it into the box.
+  if (typeof window.AMC_QUERY === "string" && window.AMC_QUERY.trim()) {
+    src.textContent = window.AMC_QUERY;
+  }
+  btn.addEventListener("click", async () => {
+    const text = src.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      // fallback for browsers / contexts without clipboard API
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); } catch (_) {}
+      document.body.removeChild(ta);
+    }
+    const orig = btn.textContent;
+    btn.textContent = "Copied ✓";
+    btn.classList.add("copied");
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 1600);
+  });
+})();
+
+</script>
+</body>
+</html>
